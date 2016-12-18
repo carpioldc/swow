@@ -8,6 +8,7 @@
 #include <arpa/inet.h>
 #include <sys/ioctl.h>
 #include <sys/socket.h>
+#include "rc_funcs.h"
 
 #define ETH_MAX_LEN 1512
 #define ETH_HLEN 14
@@ -18,44 +19,63 @@
 #define IP_ALEN 4
 #define UDP_PLEN 2
 
-int create_wow_packet( const uint32_t ip_dest, const uint16_t port_dest, char *interface, uint8_t *packet );
+struct packet_data {
+
+	uint8_t dst_inet_addr [IP_ALEN];
+	uint8_t src_inet_addr [IP_ALEN];
+	uint8_t dst_hw_addr [ETH_ALEN];
+	uint8_t src_hw_addr [ETH_ALEN];
+	uint8_t wow_hw_addr [ETH_ALEN];
+	uint16_t dst_port;
+	uint16_t src_port;
+};
+
+int create_wow_packet( struct packet_data *pd, char *interface, uint8_t *packet );
 char *find_network_interface();
 int get_phy_addr( char *interface, uint8_t *hwaddr, uint8_t *ipaddr );
+void parse_host_file( struct packet_data *pd );
 
 int main(int argc, char **argv) {
 
 	/* Variables */
 	uint16_t d_port;
 	struct in_addr d_ip;
-	char *use_str = "Usage: wow [port] ip_dest";
+	struct packet_data pd;
+	char *use_str = "Usage: wow [[port] ip_dest]";
 	const int p_len = ETH_HLEN + IP_HLEN + UDP_HLEN + WOL_LEN;
 	uint8_t packet [p_len];
 	
 	/* Parse arguments */
-	if (argc > 3 || argc < 1) {
+	if (argc > 3) {
 		perror( use_str );
 		exit( EXIT_FAILURE );
 	}
 	else {
-		if (inet_aton(argv[argc-1], &d_ip) == 0) {
-			perror( "Invalid address" );
-			exit( EXIT_FAILURE );
+		if (argc == 1)
+			parse_host_file( &pd );
+		else {
+			if (inet_aton(argv[argc-1], &d_ip) == 0) {
+				perror( "Invalid address" );
+				exit( EXIT_FAILURE );
+			}
+			
+			if (argc == 3)
+				d_port = (uint16_t)strtol( argv[1], NULL, 10 );
+			else
+				d_port = 9;
+			d_port = htons( d_port );
 		}
-		
-		if (argc == 3)
-			d_port = (uint16_t)strtol( argv[1], NULL, 10 );
-		else
-			d_port = 9;
-		d_port = htons( d_port );
 	}	
 
 	/* Welcome message */
 	printf( "Wake on WAN version 1.0\nCreated by Jorge Carpio\n");	
+	
 	/* Open pcap session */
 	int to_ms = 1000;
 	char *device = find_network_interface();
-	printf( "Opening pcap session on [%s]\n", device );
 	char errbuff[PCAP_ERRBUF_SIZE];
+	
+	printf( "Opening pcap session on [%s]\n", device );
 	pcap_t *p = pcap_open_live( device, ETH_MAX_LEN, 0, to_ms, errbuff );
 	if( p == NULL ) {
 		printf( "Error opening live capture\n%s\n", errbuff);
@@ -64,7 +84,7 @@ int main(int argc, char **argv) {
 		
 	/* Packetize */
 	
-	if(create_wow_packet( d_ip.s_addr, d_port, device, packet )) {
+	if(create_wow_packet( &pd, device, packet )) {
 		perror( "Error creating the packet" );
 		exit( EXIT_FAILURE );
 
@@ -72,16 +92,7 @@ int main(int argc, char **argv) {
 	
 	/* Send packet*/        
 	pcap_inject( p, packet, p_len );
-
-	printf( "IP: %x ", d_ip.s_addr );
-	printf("%s\n", inet_ntoa(d_ip));
-	printf( "Port: %x\n", d_port );
-	
-	printf( "Packet: ");
-	for (int i = 0; i < p_len; i++ ) {
-		printf( "%x ", packet[i]);
-	}
-	printf( "\n" );
+	printf( "Magic packet sent succesfully!\n" );
 	
 	/* Close pcap and exit */
 	pcap_close( p );
@@ -89,57 +100,59 @@ int main(int argc, char **argv) {
 }
 
 
-int create_wow_packet( uint32_t ip_dest, uint16_t port_dest, char* interface, uint8_t *packet ) {
+int create_wow_packet( struct packet_data *pd, char* interface, uint8_t *packet ) {
 	
 	uint8_t *ptr = packet;
-	uint16_t port_source = 4000;
-	uint8_t ip_source [IP_ALEN];
-	uint8_t phy_source [ETH_ALEN];
-	uint8_t phy_broad [ETH_ALEN] = {0xff, 0xff, 0xff, 0xff, 0xff, 0xff};
-	uint8_t phy_dest [ETH_ALEN] = {0x00, 0x0a, 0xe6, 0x1a, 0xdb, 0xb2};
+	uint8_t brd_hw_addr [ETH_ALEN] = {0xff, 0xff, 0xff, 0xff, 0xff, 0xff};
 	uint16_t ethertype = htons(0x0800);
-
-	if( get_phy_addr( interface, phy_source, ip_source ) != 0 )
-		return EXIT_FAILURE;
-
+	uint16_t crc;
+	
 	/* Ethernet header */
-	memcpy( ptr, phy_broad, ETH_ALEN );
+	memcpy( ptr, &pd->dst_hw_addr, ETH_ALEN );
 	ptr += ETH_ALEN;
-	memcpy( ptr, phy_source, ETH_ALEN );
+	memcpy( ptr, &pd->src_hw_addr, ETH_ALEN );
 	ptr += ETH_ALEN;
 	memcpy( ptr, &ethertype, 2 );
 	ptr += 2;
 
 	/* IP header */
-	uint8_t fields [12] = {0x45, 0x00, 0x00, 0x82, 0x1f, 0x0d, 0x40, 0x00, 0x40, 0x11, 0xff, 0xff}; // FIX CHECKSUM;
-	memcpy( ptr, fields, 12 );
-	ptr += 12;
-	 
-	for (int j = 1; j <= IP_ALEN; j ++)
-		ptr[IP_ALEN - j] = ip_source[j-1];
+	uint8_t fields [10] = {0x45, 0x00, 0x00, 0x82, 0x1f, 0x0d, 0x40, 0x00, 0x40, 0x11};
+	memcpy( ptr, fields, 10 );
+	ptr += 10;
 	
+	crc = crc_ccitt( fields, 10 ); /* IP checksum */
+	//crc = htons( crc );
+	crc = 0x3623;
+	memcpy( ptr, &crc, 2 );
+        ptr += 2;
+
+	/* for (int j = 1; j <= IP_ALEN; j ++)
+	 *	ptr[IP_ALEN - j] = pd->src_inet_addr[j-1];
+	 */
+
+	memcpy( ptr, pd->src_inet_addr, IP_ALEN );
 	ptr += IP_ALEN;
-	memcpy( ptr, &ip_dest, IP_ALEN );
+	memcpy( ptr, pd->dst_inet_addr, IP_ALEN );
 	ptr += IP_ALEN;
 
 	/* UDP header */
-	memcpy( ptr, &port_source, UDP_PLEN );
+	memcpy( ptr, &pd->src_port, UDP_PLEN );
 	ptr += UDP_PLEN;
-	memcpy( ptr, &port_dest, UDP_PLEN );
+	memcpy( ptr, &pd->dst_port, UDP_PLEN );
 	ptr += UDP_PLEN;
 	fields[0] = 0x00;
        	fields[1] = 0x6e;
-       	fields[2] = 0xff;
-	fields[3] = 0xff; // FIX CHECKSUM
+       	fields[2] = 0x00;	/* UDP checksum not used */
+       	fields[3] = 0x00;
 	memcpy( ptr, fields, 4 );
 	ptr += 4;
 	
 	/* WOW content*/
-	uint8_t sync [ETH_ALEN] = {0xff, 0xff, 0xff, 0xff, 0xff, 0xff};
+	uint8_t *sync = brd_hw_addr;
 	memcpy( ptr, sync, ETH_ALEN );
 	ptr += ETH_ALEN;
 	for (int k = 0; k < 16; k ++) {
-		memcpy( ptr, phy_dest, ETH_ALEN );
+		memcpy( ptr, pd->wow_hw_addr, ETH_ALEN );
 		ptr += ETH_ALEN;
 	}
 	
@@ -194,4 +207,24 @@ int get_phy_addr( char *interface, uint8_t *hwaddr, uint8_t *ipaddr ) {
 		
 	return 0;
 }
+
+void parse_host_file( struct packet_data *pd ) {
+
+	uint8_t dinetaddr[IP_ALEN] = {2, 139, 51, 209}; 
+	uint8_t sinetaddr[IP_ALEN] = {192, 168, 1, 36};
+	uint8_t dhwaddr[ETH_ALEN] = {0x38, 0x72, 0xc0, 0x35, 0x94, 0xd6};
+	uint8_t shwaddr[ETH_ALEN] = {0xe8, 0x11, 0x32, 0xee, 0x8b, 0xc4};
+	uint8_t whwaddr[ETH_ALEN] = {0x00, 0x0a, 0xe6, 0x1a, 0xdb, 0xb2};
+	uint16_t dport = htons(9);
+	uint16_t sport = htons(4000);
+
+	memcpy( pd->dst_inet_addr, dinetaddr, IP_ALEN );
+	memcpy( pd->src_inet_addr, sinetaddr, IP_ALEN ); 
+	memcpy( pd->dst_hw_addr, dhwaddr, ETH_ALEN );
+	memcpy( pd->src_hw_addr, shwaddr, ETH_ALEN );
+	memcpy( pd->wow_hw_addr, whwaddr, ETH_ALEN );
+	pd->dst_port = dport;
+	pd->src_port = sport;
+}
+
 
