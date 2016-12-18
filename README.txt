@@ -1,3 +1,18 @@
+_______________________________________________________
+
+Instructions: 
+
+1.	Add arp entry on router 
+	 > arp add 192.168.1.198 00:0A:E6:1A:DB:B2
+
+2.	Perform wake on WAN 
+	 [local@host ~]$ sudo ./wow
+
+3.	Remember to activate magic packet wol at shutdown
+	 [remote@host ~]$ sudo ethtool -s eth0 wol g
+
+________________________________________________________
+
 int pcap_inject(pcap_t *p, const void *buf, size_t size);
 
 /*
