@@ -4,37 +4,40 @@
 int main(int argc, char **argv) {
 
 	/* Variables */
-	uint16_t d_port;
 	struct in_addr d_ip;
 	struct packet_data pd;
-	char *use_str = "Usage: wow [[port] ip_dest]";
 	const int p_len = ETH_HLEN + IP_HLEN + UDP_HLEN + WOL_LEN;
 	uint8_t packet [p_len];
+	char* host_file = NULL;	
+	char conf = "/etc/wowan/wowlan.conf";
+	int c;	
 	
 	/* Parse arguments */
-	if (argc > 3) {
-		perror( use_str );
-		exit( EXIT_FAILURE );
-	}
-	else {
-		if (argc == 1)
-			parse_host_file( &pd );
-		else {
-			if (inet_aton(argv[argc-1], &d_ip) == 0) {
-				perror( "Invalid address" );
-				exit( EXIT_FAILURE );
-			}
-			
-			if (argc == 3)
-				d_port = (uint16_t)strtol( argv[1], NULL, 10 );
-			else
-				d_port = 9;
-			d_port = htons( d_port );
+	while((c = getopt (argc, argv, "c:")) != -1)
+		switch (c)
+		{
+			case 'c':
+				host_file = optarg;
+				break;
+			case '?':
+				if (optopt == 'c')
+					fprintf (stderr, "Option -%c requires to specify the host file as argument.\n", optopt);
+				else if (isprint (optopt))
+					fprintf (stderr, "Unknown option `-%c'.\n", optopt);
+				else
+					fprintf (stderr, "Unknown option character `\\x%x'.\n",	optopt);
+				return EXIT_FAILURE;
+			default:
+				abort ();
 		}
-	}	
 
+	if( host_file == NULL )
+		get_last_hf( conf, host_file );
+		
+	parse_host_file( &pd, host_file );
+			
 	/* Welcome message */
-	printf( "Wake on WAN version 1.0\nCreated by Jorge Carpio\n");	
+	printf( "Wake On WAN version 1.0\n" );
 	
 	/* Open pcap session */
 	int to_ms = 1000;
@@ -174,7 +177,7 @@ int get_phy_addr( char *interface, uint8_t *hwaddr, uint8_t *ipaddr ) {
 	return 0;
 }
 
-void parse_host_file( struct packet_data *pd ) {
+int parse_host_file( struct packet_data *pd, char* filename ) {
 
 	uint8_t dinetaddr[IP_ALEN] = {2, 139, 51, 209}; 
 	uint8_t sinetaddr[IP_ALEN] = {192, 168, 1, 36};
@@ -193,4 +196,20 @@ void parse_host_file( struct packet_data *pd ) {
 	pd->src_port = sport;
 }
 
+int get_last_hf( char* conf_file, char* filename ) {
+
+	FILE *fp;
+	char **lineptr;
+	size_t *n;
+	*lineptr = NULL;
+	*n = 0;
+
+	fp = fopen( filename );
+	if( fp == NULL )
+		return EXIT_FAILURE;
+
+	while( getline( lineptr, n, fp ) != -1 ) {
+		// AQUI determine last host file
+	}
+}
 

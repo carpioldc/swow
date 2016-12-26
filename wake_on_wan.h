@@ -6,6 +6,7 @@
 #include <netinet/in.h>
 #include <net/if.h>
 #include <arpa/inet.h>
+#include <unistd.h>
 #include <sys/ioctl.h>
 #include <sys/socket.h>
 
@@ -35,5 +36,6 @@ char *find_network_interface();
 
 int get_phy_addr( char *interface, uint8_t *hwaddr, uint8_t *ipaddr );
 
-void parse_host_file( struct packet_data *pd );
+int parse_host_file( struct packet_data *pd );
 
+int get_last_hf( char *conf_file, char *filename );
