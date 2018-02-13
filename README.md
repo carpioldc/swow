@@ -1,15 +1,15 @@
 # Wake on WAN
 
-This is an effort to extend the Wake on LAN protocol to work from outside your LAN through port forwarding. ==You must note that last time I tried this was not exactly working==.
+This is an effort to extend the Wake on LAN protocol to work from outside your LAN through port forwarding. You must note that last time I tried this was not exactly working.
 
 ## Steps to make it work:
 
 ### Build
 
 Clone the repository. 
-  
+
     $ git clone git@github.com:carpioldc/wowan.git
-    
+
 Build things
     
     $ cd wowan
