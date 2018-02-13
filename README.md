@@ -10,7 +10,7 @@ Clone the repository.
 
     $ git clone git@github.com:carpioldc/wowan.git
 
-Build things
+Build things. Requires libpcap.
     
     $ cd wowan
     $ make
