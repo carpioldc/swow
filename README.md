@@ -1,6 +1,6 @@
-#Wake on WAN
+# Wake on WAN
 
-This is an effort to extend the Wake on LAN protocol to work from outside your LAN through port forwarding. ==You must note that last time I tried this was not exactly working==.
+This is an effort to extend the Wake on LAN protocol to work from outside your LAN through port forwarding. You must note that last time I tried this was not exactly working.
 
 ## Steps to make it work:
 
@@ -8,9 +8,9 @@ This is an effort to extend the Wake on LAN protocol to work from outside your L
 
 Clone the repository. 
 
-  $ git clone git@github.com:carpioldc/wowan.git
-    
-Build things
+    $ git clone git@github.com:carpioldc/wowan.git
+
+Build things. Requires libpcap.
     
     $ cd wowan
     $ make
@@ -26,6 +26,6 @@ Build things
 
 4.  Remember to activate WoL (magic packet mode) on your sleepy machine interface. You can do this by running ``ethtool -s eth0 wol g`` as root. Make sure this change persists power-offs.
 
----
+
 *Good luck.*
 
