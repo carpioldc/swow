@@ -9,15 +9,7 @@
 #include <unistd.h>
 #include <sys/ioctl.h>
 #include <sys/socket.h>
-
-#define ETH_MAX_LEN 1512
-#define ETH_HLEN 14
-#define IP_HLEN 20
-#define UDP_HLEN 8
-#define WOL_LEN 102
-#define ETH_ALEN 6
-#define IP_ALEN 4
-#define UDP_PLEN 2
+#include "macros.h"
 
 struct packet_data {
 
@@ -36,6 +28,6 @@ char *find_network_interface();
 
 int get_phy_addr( char *interface, uint8_t *hwaddr, uint8_t *ipaddr );
 
-int parse_host_file( struct packet_data *pd );
+int parse_host_file( struct packet_data *pd, char* filename );
 
 int get_last_hf( char *conf_file, char *filename );

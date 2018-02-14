@@ -1,6 +1,11 @@
 #include "rc_funcs.h"
 #include "wake_on_wan.h"
 
+/**
+ * Wake on WAN
+ *
+ *
+ */
 int main(int argc, char **argv) {
 
 	/* Variables */
@@ -9,7 +14,7 @@ int main(int argc, char **argv) {
 	const int p_len = ETH_HLEN + IP_HLEN + UDP_HLEN + WOL_LEN;
 	uint8_t packet [p_len];
 	char* host_file = NULL;	
-	char conf = "/etc/wowan/wowlan.conf";
+	char* conf = "/etc/wowan/wowlan.conf";
 	int c;	
 	
 	/* Parse arguments */
@@ -120,7 +125,8 @@ int create_wow_packet( struct packet_data *pd, char* interface, uint8_t *packet 
 	uint8_t *sync = brd_hw_addr;
 	memcpy( ptr, sync, ETH_ALEN );
 	ptr += ETH_ALEN;
-	for (int k = 0; k < 16; k ++) {
+  int k = 0;
+	for (k; k < 16; k ++) {
 		memcpy( ptr, pd->wow_hw_addr, ETH_ALEN );
 		ptr += ETH_ALEN;
 	}
@@ -164,7 +170,8 @@ int get_phy_addr( char *interface, uint8_t *hwaddr, uint8_t *ipaddr ) {
 
 	printf( "%d addresses returned\n", ifc.ifc_len);
 
-	for( int r = 0; r < ifc.ifc_len; r ++) {
+  int r = 0;
+	for (r; r < ifc.ifc_len; r ++) {
 		memcpy(ipaddr, ifc.ifc_req[r].ifr_addr.sa_data, IP_ALEN);
 		printf("%d:: %s %s ip: ", r, "Interface", ifc.ifc_req[r].ifr_name);
 		printf("%d.", ipaddr[0]);
@@ -177,6 +184,9 @@ int get_phy_addr( char *interface, uint8_t *hwaddr, uint8_t *ipaddr ) {
 	return 0;
 }
 
+/**
+ *
+ */
 int parse_host_file( struct packet_data *pd, char* filename ) {
 
 	uint8_t dinetaddr[IP_ALEN] = {2, 139, 51, 209}; 
@@ -196,6 +206,9 @@ int parse_host_file( struct packet_data *pd, char* filename ) {
 	pd->src_port = sport;
 }
 
+/**
+ *
+ */
 int get_last_hf( char* conf_file, char* filename ) {
 
 	FILE *fp;
@@ -204,7 +217,7 @@ int get_last_hf( char* conf_file, char* filename ) {
 	*lineptr = NULL;
 	*n = 0;
 
-	fp = fopen( filename );
+	fp = fopen(filename, "r");
 	if( fp == NULL )
 		return EXIT_FAILURE;
 
